@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -83,7 +84,14 @@ class _MyAppState extends State<MyApp> {
             final controller = webViewController;
             if(controller != null) {
               if (await controller.canGoBack()) {
-                await controller.goBack();
+                var history = await controller.getCopyBackForwardList();
+                var first_page = history?.list?.first;
+                if (first_page != null){
+                  await controller.goTo(historyItem: first_page);
+                } else {
+                  await controller.goBack();
+                }
+                // controller.loadUrl(urlRequest: URLRequest(url: Uri.parse("https://smartreports.it/dashboard")));
                 return false;
               }
             }
