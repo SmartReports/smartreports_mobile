@@ -61,35 +61,47 @@ class _WebViewAppState extends State<WebViewApp> {
   Future<bool> _getSystemBrightness() async {
     // Retrieve the brightness of the system theme
     var brightness = MediaQuery.platformBrightnessOf(context);
-    _setBackgroundColor(brightness != Brightness.dark);
     setState(() {
       color = brightness == Brightness.dark ? Color(0xff202020) : Colors.white;
     });
+    _setBackgroundColor(brightness == Brightness.dark);
     return brightness == Brightness.dark;
   }
 
   Future<void> _setBackgroundColor(bool system_dark) async {
-    print("System Mode: " + system_dark.toString());
-    print("Site Mode: " + site_mode.toString());
     if (!started){
-      print("Site Mode: null");
-      final response = await controller.runJavaScriptReturningResult("document.getElementById('dark-mode-switch').outerHTML");
-      if (response.toString().contains("model-value==false")){
-        site_mode = false;
-      } else {
-        site_mode = true;
+      var response = '';
+      while(!response.contains("model-value")) {
+        response = (await controller.runJavaScriptReturningResult(
+            "document.getElementById('dark-mode-switch').outerHTML"))
+            .toString();
+        await Future.delayed(Duration(seconds: 1));
       }
-      started = true;
+      setState(() {
+        if (response.toString().contains("model-value==false")){
+          site_mode = false;
+        } else {
+          if (system_dark)
+            controller.runJavaScript("document.getElementById('dark-mode-switch').click()");
+            site_mode = true;
+        }
+        started = true;
+      });
+      return;
     }
     if (system_dark && site_mode==false){
       controller.runJavaScript("document.getElementById('dark-mode-switch').click()");
-      site_mode = true;
+      setState(() {
+        site_mode = true;
+      });
       return;
 
     }
     if (!system_dark && site_mode==true){
       controller.runJavaScript("document.getElementById('dark-mode-switch').click()");
-      site_mode = false;
+      setState(() {
+        site_mode = false;
+      });
       return;
     }
   }
