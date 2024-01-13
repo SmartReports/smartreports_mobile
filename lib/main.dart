@@ -1,170 +1,96 @@
-import 'dart:async';
-import 'dart:ffi';
-import 'dart:io';
+
+
 import 'package:flutter/material.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
-Future main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  if (Platform.isAndroid) {
-    await AndroidInAppWebViewController.setWebContentsDebuggingEnabled(true);
-  }
-
-  runApp(MaterialApp(
-      home: new MyApp()
-  ));
-}
-
-class MyApp extends StatefulWidget {
-  @override
-  _MyAppState createState() => new _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-
-  final GlobalKey webViewKey = GlobalKey();
-
-  InAppWebViewController? webViewController;
-  InAppWebViewGroupOptions options = InAppWebViewGroupOptions(
-      crossPlatform: InAppWebViewOptions(
-        useShouldOverrideUrlLoading: true,
-        mediaPlaybackRequiresUserGesture: false,
-        verticalScrollBarEnabled: false,
-        horizontalScrollBarEnabled: false,
-        disableHorizontalScroll: true,
-        supportZoom: false,
-      ),
-      android: AndroidInAppWebViewOptions(
-        useHybridComposition: true,
-        builtInZoomControls: false,
-      ),
-      ios: IOSInAppWebViewOptions(
-        allowsInlineMediaPlayback: true,
-
-      )
+var site_mode = false;
+var started = false;
+void main() {
+  runApp(
+    MaterialApp(
+      home: WebViewApp(),
+    ),
   );
+}
+class WebViewApp extends StatefulWidget {
+  const WebViewApp({super.key});
 
-  late PullToRefreshController pullToRefreshController;
-  String url = "";
-  double progress = 0;
-  final urlController = TextEditingController();
+  @override
+  State<WebViewApp> createState() => _WebViewAppState();
+}
 
+class _WebViewAppState extends State<WebViewApp> {
+  late final WebViewController controller;
+  late Color color = Colors.white;
   @override
   void initState() {
     super.initState();
-
-    pullToRefreshController = PullToRefreshController(
-      options: PullToRefreshOptions(
-        color: Colors.blue,
-      ),
-      onRefresh: () async {
-        if (Platform.isAndroid) {
-          webViewController?.reload();
-        } else if (Platform.isIOS) {
-          webViewController?.loadUrl(
-              urlRequest: URLRequest(url: await webViewController?.getUrl()));
-        }
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
+    controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..loadRequest(
+        Uri.parse('https://smartreports.it'),
+      );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: WillPopScope(
-          onWillPop: () async {
-            final controller = webViewController;
-            if(controller != null) {
-              if (await controller.canGoBack()) {
-                var history = await controller.getCopyBackForwardList();
-                var first_page = history?.list?.first;
-                if (first_page != null){
-                  await controller.goTo(historyItem: first_page);
-                } else {
-                  await controller.goBack();
-                }
-                // controller.loadUrl(urlRequest: URLRequest(url: Uri.parse("https://smartreports.it/dashboard")));
-                return false;
-              }
-            }
-            return true;
+      appBar: AppBar(
+        title: const Text(''),
+        toolbarHeight: -10,
+        backgroundColor: color==Colors.white? Color(0xff202020) : Colors.white,
+      ),
+      body: WebViewWidget(
+        controller: controller,
+      ),
+      bottomNavigationBar: FutureBuilder<bool>(
+        // Use FutureBuilder to dynamically get the system's brightness
+        future: _getSystemBrightness(),
+        builder: (context, snapshot) {
+          return Container(
+            height: 30.0,
+            color: color,
+          );
         },
-          child: InAppWebView(
-          key: webViewKey,
-          initialUrlRequest:
-          URLRequest(url: Uri.parse("https://smartreports.it/")),
-          initialOptions: options,
-          pullToRefreshController: pullToRefreshController,
-          onWebViewCreated: (controller) {
-            webViewController = controller;
-          },
-          onLoadStart: (controller, url) {
-            setState(() {
-              this.url = url.toString();
-              urlController.text = this.url;
-            });
-          },
-          androidOnPermissionRequest: (controller, origin, resources) async {
-            return PermissionRequestResponse(
-                resources: resources,
-                action: PermissionRequestResponseAction.GRANT);
-          },
-          shouldOverrideUrlLoading: (controller, navigationAction) async {
-            var uri = navigationAction.request.url!;
-
-            if (![ "http", "https", "file", "chrome",
-              "data", "javascript", "about"].contains(uri.scheme)) {
-              if (await canLaunch(url)) {
-                // Launch the App
-                await launch(
-                  url,
-                );
-                // and cancel the request
-                return NavigationActionPolicy.CANCEL;
-              }
-            }
-
-            return NavigationActionPolicy.ALLOW;
-          },
-          onLoadStop: (controller, url) async {
-            pullToRefreshController.endRefreshing();
-            setState(() {
-              this.url = url.toString();
-              urlController.text = this.url;
-            });
-          },
-          onLoadError: (controller, url, code, message) {
-            pullToRefreshController.endRefreshing();
-          },
-          onProgressChanged: (controller, progress) {
-            if (progress == 100) {
-              pullToRefreshController.endRefreshing();
-            }
-            setState(() {
-              this.progress = progress / 100;
-              urlController.text = this.url;
-            });
-          },
-          onUpdateVisitedHistory: (controller, url, androidIsReload) {
-            setState(() {
-              this.url = url.toString();
-              urlController.text = this.url;
-            });
-          },
-          onConsoleMessage: (controller, consoleMessage) {
-            print(consoleMessage);
-          },
-        ),
-        ),
-        ),
+      ),
     );
+
+  }
+
+
+  Future<bool> _getSystemBrightness() async {
+    // Retrieve the brightness of the system theme
+    var brightness = MediaQuery.platformBrightnessOf(context);
+    _setBackgroundColor(brightness != Brightness.dark);
+    setState(() {
+      color = brightness == Brightness.dark ? Color(0xff202020) : Colors.white;
+    });
+    return brightness == Brightness.dark;
+  }
+
+  Future<void> _setBackgroundColor(bool system_dark) async {
+    print("System Mode: " + system_dark.toString());
+    print("Site Mode: " + site_mode.toString());
+    if (!started){
+      print("Site Mode: null");
+      final response = await controller.runJavaScriptReturningResult("document.getElementById('dark-mode-switch').outerHTML");
+      if (response.toString().contains("model-value==false")){
+        site_mode = false;
+      } else {
+        site_mode = true;
+      }
+      started = true;
+    }
+    if (system_dark && site_mode==false){
+      controller.runJavaScript("document.getElementById('dark-mode-switch').click()");
+      site_mode = true;
+      return;
+
+    }
+    if (!system_dark && site_mode==true){
+      controller.runJavaScript("document.getElementById('dark-mode-switch').click()");
+      site_mode = false;
+      return;
+    }
   }
 }
