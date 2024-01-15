@@ -5,6 +5,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'LocalNotificationService.dart';
 
+
 var started = false;
 var response = '';
 Future main() async {
@@ -166,7 +167,7 @@ class _MyAppState extends State<MyApp> {
                     },
                     onConsoleMessage: (controller, consoleMessage) {
                       LocalNotificationService().showLocalNotification("DataX", "Dear Paul, The OEE today is out of your range");
-                      print(consoleMessage);
+                      // print(consoleMessage);
                     },
                   ),
                 ),

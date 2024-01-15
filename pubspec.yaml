@@ -1,6 +1,6 @@
 environment:
   sdk: '^3.2.0'
-name: "gay"
+name: "DataX"
 dependencies:
   webview_flutter: ^4.4.4
   flutter_inappwebview: ^5.7.0
