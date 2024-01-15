@@ -1,17 +1,18 @@
 import 'dart:async';
-import 'dart:ffi';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'LocalNotificationService.dart';
 
+var started = false;
+var response = '';
 Future main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  await LocalNotificationService().init();
   if (Platform.isAndroid) {
     await AndroidInAppWebViewController.setWebContentsDebuggingEnabled(true);
   }
-
   runApp(MaterialApp(
       home: new MyApp()
   ));
@@ -21,11 +22,9 @@ class MyApp extends StatefulWidget {
   @override
   _MyAppState createState() => new _MyAppState();
 }
-
 class _MyAppState extends State<MyApp> {
 
   final GlobalKey webViewKey = GlobalKey();
-
   InAppWebViewController? webViewController;
   InAppWebViewGroupOptions options = InAppWebViewGroupOptions(
       crossPlatform: InAppWebViewOptions(
@@ -54,7 +53,6 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-
     pullToRefreshController = PullToRefreshController(
       options: PullToRefreshOptions(
         color: Colors.blue,
@@ -74,10 +72,24 @@ class _MyAppState extends State<MyApp> {
   void dispose() {
     super.dispose();
   }
-
+  late Color color = Color(0xff202020);
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(-10.0),
+        child: FutureBuilder<bool>(
+          // Use FutureBuilder to dynamically get the system's brightness
+          future: _getSystemUP(),
+          builder: (context, snapshot) {
+            return AppBar(
+              title: Text(''), // You can set your title here
+              toolbarHeight: -10,
+              backgroundColor: color,
+            );
+          },
+        ),
+      ),
       body: SafeArea(
         child: WillPopScope(
           onWillPop: () async {
@@ -160,11 +172,55 @@ class _MyAppState extends State<MyApp> {
             });
           },
           onConsoleMessage: (controller, consoleMessage) {
+            LocalNotificationService().showLocalNotification("DataX", "Dear Paul, The OEE today is out of your range");
             print(consoleMessage);
           },
         ),
         ),
         ),
+      bottomNavigationBar: FutureBuilder<bool>(
+        // Use FutureBuilder to dynamically get the system's brightness
+        future: _getSystemBrightness(),
+        builder: (context, snapshot) {
+          return Container(
+            height: 30.0,
+            color: color,
+          );
+        },
+      ),
     );
   }
+Future<bool> _getSystemUP() async {
+  // Retrieve the brightness of the system theme
+  var brightness = MediaQuery.platformBrightnessOf(context);
+  setState(() {
+    color = brightness == Brightness.dark ? Color(0xff202020) : Colors.white;
+  });
+  return brightness == Brightness.dark;
+}
+
+Future<bool> _getSystemBrightness() async {
+  // Retrieve the brightness of the system theme
+  var brightness = MediaQuery.platformBrightnessOf(context);
+  if (( webViewController?.evaluateJavascript(
+      source: 'document.getElementById("dark-mode-switch").outerHTML.includes(\'model-value="'+ (brightness == Brightness.dark).toString() +'"\')'))
+      .toString()!='null')
+  _setBackgroundColor(brightness == Brightness.dark);
+  return brightness == Brightness.dark;
+}
+
+Future<void> _setBackgroundColor(bool system_dark) async {
+  print("System: " + system_dark.toString());
+  print("Site: " + response);
+  if (response != system_dark.toString()){
+    response = (webViewController?.evaluateJavascript(
+        source: 'document.getElementById("dark-mode-switch").outerHTML.includes(\'model-value="'+ system_dark.toString() +'"\')'))
+        .toString();
+      webViewController?.evaluateJavascript(
+          source: "document.getElementById('dark-mode-switch').click()");
+      };
+      // sleep 1 sec
+      await Future.delayed(Duration(seconds: 1));
+      print(response != system_dark.toString());
+    }
 }
